@@ -7,6 +7,7 @@
     <style>
         :root {
             --primary: #1a73e8; 
+            --success: #0f9d58;
             --bg-color: #f8f9fa;
             --card-bg: #ffffff;
             --text-main: #202124;
@@ -18,14 +19,17 @@
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 12px; text-transform: uppercase; color: #5f6368; }
         input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
         textarea { height: 120px; }
-        button { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; font-size: 16px; }
-        button:hover { background: #1557b0; }
+        
+        .btn-primary { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; font-size: 16px; }
+        .btn-primary:hover { background: #1557b0; }
+        
+        .btn-copy-all { background: var(--success); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 20px; font-size: 18px; display: none; }
+        .btn-copy-all:hover { background: #0b8043; }
+
         .results { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
-        .result-card { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 12px; cursor: pointer; position: relative; border: 1px solid var(--border); transition: 0.2s; }
-        .result-card:hover { border-color: var(--primary); background: #f8faff; transform: translateY(-2px); }
+        .result-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border); }
         .result-card span { display: block; font-size: 11px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
         .result-card strong { font-size: 15px; word-break: break-all; color: #1c1e21; line-height: 1.4; }
-        .copy-badge { position: absolute; right: 10px; top: 10px; font-size: 10px; color: var(--primary); border: 1px solid var(--primary); padding: 2px 6px; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -39,23 +43,23 @@
     <label>2. Paste Post Text</label>
     <textarea id="textInput" placeholder="Paste the post content here..."></textarea>
 
-    <button onclick="processDeal()">Clean Link & Extract Info</button>
+    <button class="btn-primary" onclick="processDeal()">Clean Link & Extract Info</button>
 
     <div id="output" class="results">
-        <div class="result-card" onclick="copyThis('resTitle')">
-            <div class="copy-badge">Copy</div>
+        <!-- Single Copy Button -->
+        <button id="copyAllBtn" class="btn-copy-all" onclick="copyAll()">📋 Copy All Info</button>
+
+        <div class="result-card">
             <span>Product Title</span>
             <strong id="resTitle"></strong>
         </div>
 
-        <div class="result-card" onclick="copyThis('resPriceLine')">
-            <div class="copy-badge">Copy</div>
+        <div class="result-card">
             <span>Full Price Line (Hook)</span>
             <strong id="resPriceLine"></strong>
         </div>
 
-        <div class="result-card" onclick="copyThis('cleanUrl')">
-            <div class="copy-badge">Copy</div>
+        <div class="result-card">
             <span>Cleaned URL</span>
             <strong id="cleanUrl"></strong>
         </div>
@@ -80,7 +84,6 @@ function processDeal() {
 
     // --- 2. TEXT EXTRACTION ---
     const text = document.getElementById('textInput').value;
-    // Split into lines and remove empty ones
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
     if (lines.length === 0) return;
@@ -90,8 +93,6 @@ function processDeal() {
     let priceLine = priceLineIndex !== -1 ? lines[priceLineIndex] : "Price line not found";
 
     // Find the Title
-    // Logic: If the price is on the first line, the title is the second line.
-    // If the price is on the second line, the title is the first line.
     let title = "";
     if (priceLineIndex === 0) {
         title = lines[1] || lines[0];
@@ -101,22 +102,32 @@ function processDeal() {
         title = lines[0];
     }
 
-    // Clean up emojis and "See less" text from the title
-    title = title.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu, '');
+    // Clean up "See less" text from the title but KEEP emojis
     title = title.replace(/See less$/i, '').trim();
 
     document.getElementById('resTitle').innerText = title;
     document.getElementById('resPriceLine').innerText = priceLine;
+    
+    // Show results and the Copy All button
     document.getElementById('output').style.display = 'block';
+    document.getElementById('copyAllBtn').style.display = 'block';
+    document.getElementById('copyAllBtn').innerText = "📋 Copy All Info";
 }
 
-function copyThis(id) {
-    const val = document.getElementById(id).innerText;
-    if (!val || val.includes("not found")) return;
-    navigator.clipboard.writeText(val).then(() => {
-        const el = document.getElementById(id).parentElement;
-        el.style.background = "#d4edda";
-        setTimeout(() => el.style.background = "#fff", 300);
+function copyAll() {
+    const title = document.getElementById('resTitle').innerText;
+    const price = document.getElementById('resPriceLine').innerText;
+    const url = document.getElementById('cleanUrl').innerText;
+
+    // Combine all three with new lines
+    const combinedText = `${title}\n${price}\n${url}`;
+
+    navigator.clipboard.writeText(combinedText).then(() => {
+        const btn = document.getElementById('copyAllBtn');
+        btn.innerText = "✅ Copied Everything!";
+        setTimeout(() => {
+            btn.innerText = "📋 Copy All Info";
+        }, 2000);
     });
 }
 </script>
