@@ -13,7 +13,7 @@
             --border: #dadce0;
         }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
-        .container { max-width: 600px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .container { max-width: 700px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         h2 { margin-top: 0; font-size: 18px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; text-align: center;}
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 12px; text-transform: uppercase; color: #5f6368; }
         input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
@@ -33,7 +33,7 @@
 <div class="container">
     <h2>CB Link & Text Extractor</h2>
     
-    <label>1. Paste Facebook URL (Any Format)</label>
+    <label>1. Paste Facebook URL</label>
     <input type="text" id="urlInput" placeholder="Paste link here...">
 
     <label>2. Paste Post Text</label>
@@ -42,22 +42,22 @@
     <button onclick="processDeal()">Clean Link & Extract Info</button>
 
     <div id="output" class="results">
+        <div class="result-card" onclick="copyThis('resTitle')">
+            <div class="copy-badge">Copy</div>
+            <span>Product Title</span>
+            <strong id="resTitle"></strong>
+        </div>
+
+        <div class="result-card" onclick="copyThis('resPriceLine')">
+            <div class="copy-badge">Copy</div>
+            <span>Full Price Line (Hook)</span>
+            <strong id="resPriceLine"></strong>
+        </div>
+
         <div class="result-card" onclick="copyThis('cleanUrl')">
             <div class="copy-badge">Copy</div>
             <span>Cleaned URL</span>
             <strong id="cleanUrl"></strong>
-        </div>
-        
-        <div class="result-card" onclick="copyThis('resTitle')">
-            <div class="copy-badge">Copy</div>
-            <span>Extracted Title</span>
-            <strong id="resTitle"></strong>
-        </div>
-
-        <div class="result-card" onclick="copyThis('resPrice')">
-            <div class="copy-badge">Copy</div>
-            <span>Detected Price</span>
-            <strong id="resPrice"></strong>
         </div>
     </div>
 </div>
@@ -80,38 +80,39 @@ function processDeal() {
 
     // --- 2. TEXT EXTRACTION ---
     const text = document.getElementById('textInput').value;
+    // Split into lines and remove empty ones
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
 
-    const priceRegex = /\$\d+(?:\.\d{2})?/;
-    const priceMatch = text.match(priceRegex);
-    const detectedPrice = priceMatch ? priceMatch[0] : "Price not found";
+    if (lines.length === 0) return;
 
-    const separators = [" -- ", " - ", " | ", " ~ ", " // ", " ✨ ", " 👉 ", " : "];
-    let detectedTitle = "Title not found";
+    // Find the line that contains the price ($)
+    let priceLineIndex = lines.findIndex(line => line.includes('$'));
+    let priceLine = priceLineIndex !== -1 ? lines[priceLineIndex] : "Price line not found";
 
-    let hookLine = lines.find(line => line.includes(detectedPrice)) || "";
-    let foundSep = separators.find(s => hookLine.includes(s));
-
-    if (foundSep) {
-        let parts = hookLine.split(foundSep);
-        detectedTitle = parts.find(p => !p.includes(detectedPrice)).trim();
+    // Find the Title
+    // Logic: If the price is on the first line, the title is the second line.
+    // If the price is on the second line, the title is the first line.
+    let title = "";
+    if (priceLineIndex === 0) {
+        title = lines[1] || lines[0];
+    } else if (priceLineIndex > 0) {
+        title = lines[0];
     } else {
-        if (lines.length > 0) {
-            detectedTitle = lines[0].includes(detectedPrice) ? (lines[1] || lines[0]) : lines[0];
-        }
+        title = lines[0];
     }
 
-    // Clean up emojis
-    detectedTitle = detectedTitle.replace(/[❤🧣❄✨🔥✅🛍️]/g, '').trim();
+    // Clean up emojis and "See less" text from the title
+    title = title.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu, '');
+    title = title.replace(/See less$/i, '').trim();
 
-    document.getElementById('resTitle').innerText = detectedTitle;
-    document.getElementById('resPrice').innerText = detectedPrice;
+    document.getElementById('resTitle').innerText = title;
+    document.getElementById('resPriceLine').innerText = priceLine;
     document.getElementById('output').style.display = 'block';
 }
 
 function copyThis(id) {
     const val = document.getElementById(id).innerText;
-    if (val === "" || val.includes("not found")) return;
+    if (!val || val.includes("not found")) return;
     navigator.clipboard.writeText(val).then(() => {
         const el = document.getElementById(id).parentElement;
         el.style.background = "#d4edda";
