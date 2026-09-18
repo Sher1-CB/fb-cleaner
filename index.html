@@ -5,28 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CB Link & Text Extractor</title>
     <style>
-        :root {
-            --primary: #1a73e8; 
-            --success: #0f9d58;
-            --bg-color: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-main: #202124;
-            --border: #dadce0;
-        }
+        :root { --primary: #1a73e8; --success: #0f9d58; --bg-color: #f8f9fa; --card-bg: #ffffff; --text-main: #202124; --border: #dadce0; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
         .container { max-width: 700px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         h2 { margin-top: 0; font-size: 18px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; text-align: center;}
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 12px; text-transform: uppercase; color: #5f6368; }
         input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
         textarea { height: 120px; }
-        
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         .btn-primary { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; flex: 3; font-size: 16px; }
         .btn-clear { background: #f1f3f4; color: #5f6368; border: 1px solid var(--border); padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; flex: 1; font-size: 16px; }
-        
-        .btn-copy-all { background: var(--success); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 20px; font-size: 18px; display: none; }
-        .btn-copy-all:hover { background: #0b8043; }
-
+        .btn-copy-all { background: var(--success); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 18px; display: none; }
+        .btn-retry { background: #fff; color: var(--primary); border: 1px solid var(--primary); padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 20px; font-size: 14px; display: none; }
         .results { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
         .result-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border); }
         .result-card span { display: block; font-size: 11px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
@@ -51,48 +41,35 @@
 
     <div id="output" class="results">
         <button id="copyAllBtn" class="btn-copy-all" onclick="copyAll()">📋 Copy All Info</button>
-
-        <div class="result-card">
-            <span>Product Title</span>
-            <strong id="resTitle"></strong>
-        </div>
-
-        <div class="result-card">
-            <span>Full Price Line (Hook)</span>
-            <strong id="resPriceLine"></strong>
-        </div>
-
-        <div class="result-card">
-            <span>Cleaned URL</span>
-            <strong id="cleanUrl"></strong>
-        </div>
+        <button id="retryBtn" class="btn-retry" onclick="tryNextTitle()">🔄 Wrong title? Try another line</button>
+        
+        <div class="result-card"><span>Product Title</span><strong id="resTitle"></strong></div>
+        <div class="result-card"><span>Full Price Line (Hook)</span><strong id="resPriceLine"></strong></div>
+        <div class="result-card"><span>Cleaned URL</span><strong id="cleanUrl"></strong></div>
     </div>
 </div>
 
 <script>
+let candidateTitles = [];
+let currentTitleIndex = 0;
+
 function processDeal() {
-    // --- 1. ADVANCED URL CLEANER ---
+    // --- 1. URL CLEANER ---
     const rawUrl = document.getElementById('urlInput').value.trim();
     if (rawUrl) {
         try {
             const urlObj = new URL(rawUrl);
             const params = new URLSearchParams(urlObj.search);
             const multiPermalink = params.get('multi_permalinks');
-            
             let cleanUrl = "";
-
             if (multiPermalink) {
-                // Handle format: /groups/ID/?multi_permalinks=POST_ID
                 let pathParts = urlObj.pathname.split('/').filter(p => p);
-                // pathParts[1] is usually the group ID
                 cleanUrl = `https://www.facebook.com/groups/${pathParts[1]}/posts/${multiPermalink}/`;
             } else {
-                // Standard format: /groups/ID/posts/POST_ID/
                 let cleanPath = urlObj.pathname;
                 if (!cleanPath.endsWith('/')) cleanPath += '/';
                 cleanUrl = `https://www.facebook.com${cleanPath}`;
             }
-            
             document.getElementById('cleanUrl').innerText = cleanUrl;
         } catch (e) {
             document.getElementById('cleanUrl').innerText = "Invalid URL";
@@ -102,65 +79,59 @@ function processDeal() {
     // --- 2. TEXT EXTRACTION ---
     const text = document.getElementById('textInput').value;
     const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-
     if (lines.length === 0) return;
 
     let priceLineIndex = lines.findIndex(line => line.includes('$'));
     let rawPriceLine = priceLineIndex !== -1 ? lines[priceLineIndex] : "";
+    
+    // Clean Price Line (Strip Emojis)
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
+    let finalPriceLine = rawPriceLine.replace(emojiRegex, '').replace(/See less$/i, '').trim();
 
-    let finalTitle = "";
-    let finalPriceLine = rawPriceLine;
+    // Find all possible titles (lines that aren't the price line or retailer tags)
+    candidateTitles = lines.filter(line => {
+        return !line.includes('$') && 
+               !line.startsWith('[') && 
+               !line.includes('| Amazon |') && 
+               !line.includes('| Walmart |') &&
+               line.length > 3;
+    });
 
+    // If the price line actually contained the title (separated by symbols)
     const separators = ["👉", "📍", "📌", " : ", " -- ", " — ", " :: ", " | "];
     let foundSep = separators.find(s => rawPriceLine.includes(s));
-
     if (foundSep) {
         let parts = rawPriceLine.split(foundSep);
-        let partWithPrice = parts.find(p => p.includes('$'));
         let partWithoutPrice = parts.find(p => !p.includes('$'));
-        if (partWithPrice && partWithoutPrice) {
-            finalPriceLine = partWithPrice.trim();
-            finalTitle = partWithoutPrice.trim();
+        if (partWithoutPrice) {
+            candidateTitles.unshift(partWithoutPrice.trim()); // Put this at the front of the list
+            finalPriceLine = parts.find(p => p.includes('$')).replace(emojiRegex, '').trim();
         }
     }
 
-    if (!finalTitle) {
-        for (let line of lines) {
-            let l = line.toLowerCase();
-            if (line === rawPriceLine) continue;
-            if (line.startsWith('[') || line.includes('| Amazon |') || line.includes('| Walmart |')) continue;
-            
-            const hypeWords = [
-                'dropped the info', 'quick scroll', 'obsessed with', 'hard to believe', 
-                'how low', 'just went live', 'spotted this', 'had to post', 
-                'incredible value', 'so happy', 'solid grab', 'share this', 
-                'loving this', 'jaw dropped', 'secret', 'ran to post', 
-                'added to my list', 'impressed', 'glad we caught', 'crazy good', 
-                'massive drop', 'requested drop', 'wonderful value', 'top-tier', 
-                'spectacular', 'brilliant', 'info is waiting', 'details are waiting'
-            ];
-            
-            if (hypeWords.some(word => l.includes(word))) continue;
-            if (line.endsWith('!') || line.endsWith('?')) continue;
-
-            finalTitle = line;
-            break;
-        }
-    }
-
-    // CLEANUP
-    finalTitle = finalTitle.replace(/See less$/i, '').trim();
-    finalPriceLine = finalPriceLine.replace(/See less$/i, '').trim();
-
-    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
-    finalTitle = finalTitle.replace(emojiRegex, '').trim();
-    finalPriceLine = finalPriceLine.replace(emojiRegex, '').trim();
-
-    document.getElementById('resTitle').innerText = finalTitle || "Title not found";
+    currentTitleIndex = 0;
+    displayTitle(candidateTitles[0]);
     document.getElementById('resPriceLine').innerText = finalPriceLine || "Price not found";
     
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
+    document.getElementById('retryBtn').style.display = candidateTitles.length > 1 ? 'block' : 'none';
+}
+
+function tryNextTitle() {
+    currentTitleIndex++;
+    if (currentTitleIndex >= candidateTitles.length) currentTitleIndex = 0; // Loop back to start
+    displayTitle(candidateTitles[currentTitleIndex]);
+}
+
+function displayTitle(rawTitle) {
+    if (!rawTitle) {
+        document.getElementById('resTitle').innerText = "Title not found";
+        return;
+    }
+    const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
+    let cleanTitle = rawTitle.replace(emojiRegex, '').replace(/See less$/i, '').trim();
+    document.getElementById('resTitle').innerText = cleanTitle;
 }
 
 function copyAll() {
@@ -168,7 +139,6 @@ function copyAll() {
     const price = document.getElementById('resPriceLine').innerText;
     const url = document.getElementById('cleanUrl').innerText;
     const combinedText = `${title}\n${price}\n${url}`;
-
     navigator.clipboard.writeText(combinedText).then(() => {
         const btn = document.getElementById('copyAllBtn');
         btn.innerText = "✅ Copied Everything!";
@@ -180,6 +150,7 @@ function clearAll() {
     document.getElementById('urlInput').value = "";
     document.getElementById('textInput').value = "";
     document.getElementById('output').style.display = 'none';
+    candidateTitles = [];
 }
 </script>
 </body>
