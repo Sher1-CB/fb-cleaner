@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CB Link & Text Extractor</title>
+    <style>
+        :root {
+            --primary: #1a73e8; 
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #202124;
+            --border: #dadce0;
+        }
+        body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
+        .container { max-width: 600px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        h2 { margin-top: 0; font-size: 18px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; text-align: center;}
+        label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 12px; text-transform: uppercase; color: #5f6368; }
+        input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
+        textarea { height: 120px; }
+        button { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px; font-size: 16px; }
+        button:hover { background: #1557b0; }
+        .results { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
+        .result-card { background: #fff; padding: 15px; border-radius: 8px; margin-bottom: 12px; cursor: pointer; position: relative; border: 1px solid var(--border); transition: 0.2s; }
+        .result-card:hover { border-color: var(--primary); background: #f8faff; transform: translateY(-2px); }
+        .result-card span { display: block; font-size: 11px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
+        .result-card strong { font-size: 15px; word-break: break-all; color: #1c1e21; line-height: 1.4; }
+        .copy-badge { position: absolute; right: 10px; top: 10px; font-size: 10px; color: var(--primary); border: 1px solid var(--primary); padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>CB Link & Text Extractor</h2>
+    
+    <label>1. Paste Facebook URL (Any Format)</label>
+    <input type="text" id="urlInput" placeholder="Paste link here...">
+
+    <label>2. Paste Post Text</label>
+    <textarea id="textInput" placeholder="Paste the post content here..."></textarea>
+
+    <button onclick="processDeal()">Clean Link & Extract Info</button>
+
+    <div id="output" class="results">
+        <div class="result-card" onclick="copyThis('cleanUrl')">
+            <div class="copy-badge">Copy</div>
+            <span>Cleaned URL</span>
+            <strong id="cleanUrl"></strong>
+        </div>
+        
+        <div class="result-card" onclick="copyThis('resTitle')">
+            <div class="copy-badge">Copy</div>
+            <span>Extracted Title</span>
+            <strong id="resTitle"></strong>
+        </div>
+
+        <div class="result-card" onclick="copyThis('resPrice')">
+            <div class="copy-badge">Copy</div>
+            <span>Detected Price</span>
+            <strong id="resPrice"></strong>
+        </div>
+    </div>
+</div>
+
+<script>
+function processDeal() {
+    // --- 1. URL CLEANER ---
+    const rawUrl = document.getElementById('urlInput').value.trim();
+    if (rawUrl) {
+        try {
+            const urlObj = new URL(rawUrl);
+            let cleanPath = urlObj.pathname;
+            if (!cleanPath.endsWith('/')) cleanPath += '/';
+            const cleanUrl = `https://www.facebook.com${cleanPath}`;
+            document.getElementById('cleanUrl').innerText = cleanUrl;
+        } catch (e) {
+            document.getElementById('cleanUrl').innerText = "Invalid URL";
+        }
+    }
+
+    // --- 2. TEXT EXTRACTION ---
+    const text = document.getElementById('textInput').value;
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    const priceRegex = /\$\d+(?:\.\d{2})?/;
+    const priceMatch = text.match(priceRegex);
+    const detectedPrice = priceMatch ? priceMatch[0] : "Price not found";
+
+    const separators = [" -- ", " - ", " | ", " ~ ", " // ", " ✨ ", " 👉 ", " : "];
+    let detectedTitle = "Title not found";
+
+    let hookLine = lines.find(line => line.includes(detectedPrice)) || "";
+    let foundSep = separators.find(s => hookLine.includes(s));
+
+    if (foundSep) {
+        let parts = hookLine.split(foundSep);
+        detectedTitle = parts.find(p => !p.includes(detectedPrice)).trim();
+    } else {
+        if (lines.length > 0) {
+            detectedTitle = lines[0].includes(detectedPrice) ? (lines[1] || lines[0]) : lines[0];
+        }
+    }
+
+    // Clean up emojis
+    detectedTitle = detectedTitle.replace(/[❤🧣❄✨🔥✅🛍️]/g, '').trim();
+
+    document.getElementById('resTitle').innerText = detectedTitle;
+    document.getElementById('resPrice').innerText = detectedPrice;
+    document.getElementById('output').style.display = 'block';
+}
+
+function copyThis(id) {
+    const val = document.getElementById(id).innerText;
+    if (val === "" || val.includes("not found")) return;
+    navigator.clipboard.writeText(val).then(() => {
+        const el = document.getElementById(id).parentElement;
+        el.style.background = "#d4edda";
+        setTimeout(() => el.style.background = "#fff", 300);
+    });
+}
+</script>
+</body>
+</html>
