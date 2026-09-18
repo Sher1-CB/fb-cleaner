@@ -71,14 +71,28 @@
 
 <script>
 function processDeal() {
-    // --- 1. URL CLEANER ---
+    // --- 1. ADVANCED URL CLEANER ---
     const rawUrl = document.getElementById('urlInput').value.trim();
     if (rawUrl) {
         try {
             const urlObj = new URL(rawUrl);
-            let cleanPath = urlObj.pathname;
-            if (!cleanPath.endsWith('/')) cleanPath += '/';
-            const cleanUrl = `https://www.facebook.com${cleanPath}`;
+            const params = new URLSearchParams(urlObj.search);
+            const multiPermalink = params.get('multi_permalinks');
+            
+            let cleanUrl = "";
+
+            if (multiPermalink) {
+                // Handle format: /groups/ID/?multi_permalinks=POST_ID
+                let pathParts = urlObj.pathname.split('/').filter(p => p);
+                // pathParts[1] is usually the group ID
+                cleanUrl = `https://www.facebook.com/groups/${pathParts[1]}/posts/${multiPermalink}/`;
+            } else {
+                // Standard format: /groups/ID/posts/POST_ID/
+                let cleanPath = urlObj.pathname;
+                if (!cleanPath.endsWith('/')) cleanPath += '/';
+                cleanUrl = `https://www.facebook.com${cleanPath}`;
+            }
+            
             document.getElementById('cleanUrl').innerText = cleanUrl;
         } catch (e) {
             document.getElementById('cleanUrl').innerText = "Invalid URL";
@@ -116,7 +130,6 @@ function processDeal() {
             if (line === rawPriceLine) continue;
             if (line.startsWith('[') || line.includes('| Amazon |') || line.includes('| Walmart |')) continue;
             
-            // Filter out common Hype/Discovery phrases
             const hypeWords = [
                 'dropped the info', 'quick scroll', 'obsessed with', 'hard to believe', 
                 'how low', 'just went live', 'spotted this', 'had to post', 
@@ -128,8 +141,6 @@ function processDeal() {
             ];
             
             if (hypeWords.some(word => l.includes(word))) continue;
-            
-            // Titles usually don't end in ! or ? (Hype lines do)
             if (line.endsWith('!') || line.endsWith('?')) continue;
 
             finalTitle = line;
