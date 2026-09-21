@@ -93,16 +93,18 @@ function processDeal() {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
     let finalPriceLine = rawPriceLine.replace(emojiRegex, '').replace(/See less$/i, '').trim();
 
-    // Gather all lines that aren't the price line or tags
     candidateTitles = lines.filter(line => {
+        let l = line.toLowerCase();
         return !line.includes('$') && 
                !line.startsWith('[') && 
                !line.includes('| Amazon |') && 
                !line.includes('| Walmart |') &&
+               !l.includes('dropped the info') &&
+               !l.includes('quick scroll') &&
+               !l.includes('obsessed with') &&
                line.length > 3;
     });
 
-    // SMART SPLIT: Check if the price line has a title attached
     const separators = ["👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | "];
     let foundSep = separators.find(s => rawPriceLine.includes(s));
     
@@ -113,8 +115,8 @@ function processDeal() {
         
         if (partWithoutPrice) {
             const pLower = partWithoutPrice.toLowerCase();
-            // If the "other half" contains price words, it's NOT a title. Keep the whole line.
-            const priceWords = ["regular", "normally", "list", "was", "orig"];
+            // Added "previously" and "msrp" to the price words list
+            const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp"];
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
 
             if (!isActuallyPriceInfo) {
