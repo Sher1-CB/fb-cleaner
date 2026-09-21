@@ -99,6 +99,7 @@ function processDeal() {
                !line.startsWith('[') && 
                !line.includes('| Amazon |') && 
                !line.includes('| Walmart |') &&
+               !l.includes('solid find') &&
                !l.includes('happy to see') &&
                !l.includes('dropped the info') &&
                !l.includes('quick scroll') &&
@@ -106,8 +107,8 @@ function processDeal() {
                line.length > 3;
     });
 
-    // Added " // " to separators
-    const separators = [" // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | "];
+    // EXACT SEPARATOR LIST FROM YOUR TEMPLATE + TESTING ADDITIONS
+    const separators = [" -- ", " - ", " | ", " ~ ", " // ", " ✨ ", " 👉 ", " : ", "📍", "📌", "—", " :: "];
     let foundSep = separators.find(s => rawPriceLine.includes(s));
     
     if (foundSep) {
@@ -117,7 +118,6 @@ function processDeal() {
         
         if (partWithoutPrice) {
             const pLower = partWithoutPrice.toLowerCase();
-            // Added "originally" to price words
             const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp", "originally"];
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
 
