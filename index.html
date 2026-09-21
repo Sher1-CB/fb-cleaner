@@ -107,16 +107,36 @@ function processDeal() {
                line.length > 3;
     });
 
-    // EXACT SEPARATOR LIST FROM YOUR TEMPLATE + TESTING ADDITIONS
-    const separators = [" -- ", " - ", " | ", " ~ ", " // ", " ✨ ", " 👉 ", " : ", "📍", "📌", "—", " :: "];
-    let foundSep = separators.find(s => rawPriceLine.includes(s));
+    // SMART SPLIT LOGIC
+    const separators = [" // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | ", " ✨ "];
     
-    if (foundSep) {
-        let parts = rawPriceLine.split(foundSep);
+    // We look for the LAST separator in the line to avoid getting tripped up by price ranges (e.g. 10 - 20)
+    let bestSep = null;
+    let lastIndex = -1;
+
+    separators.forEach(s => {
+        let idx = rawPriceLine.lastIndexOf(s);
+        if (idx > lastIndex) {
+            // Check if this separator is likely a price range (Number - Number)
+            // If it's a hyphen surrounded by numbers, we skip it
+            if (s.trim() === "-" || s.trim() === "—") {
+                let charBefore = rawPriceLine.charAt(idx - 1);
+                let charAfter = rawPriceLine.charAt(idx + s.length);
+                if (/\d/.test(charBefore) && /\d/.test(charAfter)) {
+                    return; // Skip this hyphen, it's a price range
+                }
+            }
+            lastIndex = idx;
+            bestSep = s;
+        }
+    });
+    
+    if (bestSep) {
+        let parts = [rawPriceLine.substring(0, lastIndex), rawPriceLine.substring(lastIndex + bestSep.length)];
         let partWithPrice = parts.find(p => p.includes('$'));
         let partWithoutPrice = parts.find(p => !p.includes('$'));
         
-        if (partWithoutPrice) {
+        if (partWithoutPrice && partWithPrice) {
             const pLower = partWithoutPrice.toLowerCase();
             const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp", "originally"];
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
