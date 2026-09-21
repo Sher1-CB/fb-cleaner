@@ -99,6 +99,7 @@ function processDeal() {
                !line.startsWith('[') && 
                !line.includes('| Amazon |') && 
                !line.includes('| Walmart |') &&
+               !l.includes('brilliant find') &&
                !l.includes('solid find') &&
                !l.includes('happy to see') &&
                !l.includes('dropped the info') &&
@@ -107,24 +108,18 @@ function processDeal() {
                line.length > 3;
     });
 
-    // SMART SPLIT LOGIC
-    const separators = [" // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | ", " ✨ "];
+    const separators = [" ~ ", " // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | ", " ✨ "];
     
-    // We look for the LAST separator in the line to avoid getting tripped up by price ranges (e.g. 10 - 20)
     let bestSep = null;
     let lastIndex = -1;
 
     separators.forEach(s => {
         let idx = rawPriceLine.lastIndexOf(s);
         if (idx > lastIndex) {
-            // Check if this separator is likely a price range (Number - Number)
-            // If it's a hyphen surrounded by numbers, we skip it
             if (s.trim() === "-" || s.trim() === "—") {
                 let charBefore = rawPriceLine.charAt(idx - 1);
                 let charAfter = rawPriceLine.charAt(idx + s.length);
-                if (/\d/.test(charBefore) && /\d/.test(charAfter)) {
-                    return; // Skip this hyphen, it's a price range
-                }
+                if (/\d/.test(charBefore) && /\d/.test(charAfter)) return;
             }
             lastIndex = idx;
             bestSep = s;
@@ -154,13 +149,29 @@ function processDeal() {
     
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
-    document.getElementById('retryBtn').style.display = candidateTitles.length > 1 ? 'block' : 'none';
+    
+    // Force button to show if there are multiple lines in the post
+    document.getElementById('retryBtn').style.display = lines.length > 2 ? 'block' : 'none';
 }
 
 function tryNextTitle() {
     currentTitleIndex++;
-    if (currentTitleIndex >= candidateTitles.length) currentTitleIndex = 0;
-    displayTitle(candidateTitles[currentTitleIndex]);
+    // If we run out of filtered candidates, just use the raw lines from the post
+    const text = document.getElementById('textInput').value;
+    const allLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
+    
+    if (currentTitleIndex >= candidateTitles.length) {
+        // Cycle through all lines if candidates are exhausted
+        let allIdx = currentTitleIndex - candidateTitles.length;
+        if (allIdx >= allLines.length) {
+            currentTitleIndex = 0;
+            displayTitle(candidateTitles[0]);
+        } else {
+            displayTitle(allLines[allIdx]);
+        }
+    } else {
+        displayTitle(candidateTitles[currentTitleIndex]);
+    }
 }
 
 function displayTitle(rawTitle) {
