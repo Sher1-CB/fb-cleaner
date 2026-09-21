@@ -99,13 +99,15 @@ function processDeal() {
                !line.startsWith('[') && 
                !line.includes('| Amazon |') && 
                !line.includes('| Walmart |') &&
+               !l.includes('happy to see') &&
                !l.includes('dropped the info') &&
                !l.includes('quick scroll') &&
                !l.includes('obsessed with') &&
                line.length > 3;
     });
 
-    const separators = ["👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | "];
+    // Added " // " to separators
+    const separators = [" // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | "];
     let foundSep = separators.find(s => rawPriceLine.includes(s));
     
     if (foundSep) {
@@ -115,8 +117,8 @@ function processDeal() {
         
         if (partWithoutPrice) {
             const pLower = partWithoutPrice.toLowerCase();
-            // Added "previously" and "msrp" to the price words list
-            const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp"];
+            // Added "originally" to price words
+            const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp", "originally"];
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
 
             if (!isActuallyPriceInfo) {
