@@ -7,7 +7,8 @@
     <style>
         :root { --primary: #1a73e8; --success: #0f9d58; --bg-color: #f8f9fa; --card-bg: #ffffff; --text-main: #202124; --border: #dadce0; }
         body { font-family: -apple-system, sans-serif; background-color: var(--bg-color); color: var(--text-main); padding: 20px; }
-        .container { max-width: 700px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .container { max-width: 700px; margin: auto; background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+        .version-tag { position: absolute; top: 10px; right: 15px; font-size: 10px; color: #aaa; font-weight: bold; }
         h2 { margin-top: 0; font-size: 18px; color: var(--primary); border-bottom: 1px solid var(--border); padding-bottom: 10px; text-align: center;}
         label { font-weight: 600; display: block; margin-top: 15px; margin-bottom: 5px; font-size: 12px; text-transform: uppercase; color: #5f6368; }
         input, textarea { width: 100%; padding: 12px; border-radius: 6px; border: 1px solid var(--border); box-sizing: border-box; font-size: 14px; margin-bottom: 10px; }
@@ -26,6 +27,7 @@
 <body>
 
 <div class="container">
+    <div class="version-tag">v1.1.0</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -93,12 +95,15 @@ function processDeal() {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
     let finalPriceLine = rawPriceLine.replace(emojiRegex, '').replace(/See less$/i, '').trim();
 
+    // 1. Gather all lines that aren't the price line or retailer tags
     candidateTitles = lines.filter(line => {
         let l = line.toLowerCase();
+        // Filter out lines that are just retailer names or hype
+        const isRetailerOnly = /^(amazon|walmart|target|kohls|cvs|walgreens)\s*[|:\[\]-]*$/i.test(line.replace(emojiRegex, '').trim());
+        
         return !line.includes('$') && 
+               !isRetailerOnly &&
                !line.startsWith('[') && 
-               !line.includes('| Amazon |') && 
-               !line.includes('| Walmart |') &&
                !l.includes('brilliant find') &&
                !l.includes('solid find') &&
                !l.includes('happy to see') &&
@@ -108,7 +113,8 @@ function processDeal() {
                line.length > 3;
     });
 
-    const separators = [" ~ ", " // ", "👉", "📍", "📌", " : ", " -- ", " - ", " — ", " :: ", " | ", " ✨ "];
+    // 2. SMART SPLIT: Check if the price line has a title attached
+    const separators = [" : ", " // ", "👉", "📍", "📌", " -- ", " - ", " — ", " :: ", " | ", " ✨ ", " ~ "];
     
     let bestSep = null;
     let lastIndex = -1;
@@ -116,10 +122,11 @@ function processDeal() {
     separators.forEach(s => {
         let idx = rawPriceLine.lastIndexOf(s);
         if (idx > lastIndex) {
+            // Robust Price Range Check: Ignore hyphens between digits (e.g. 99-38 or 99 - 38)
             if (s.trim() === "-" || s.trim() === "—") {
-                let charBefore = rawPriceLine.charAt(idx - 1);
-                let charAfter = rawPriceLine.charAt(idx + s.length);
-                if (/\d/.test(charBefore) && /\d/.test(charAfter)) return;
+                let segmentBefore = rawPriceLine.substring(0, idx).trim();
+                let segmentAfter = rawPriceLine.substring(idx + s.length).trim();
+                if (/\d$/.test(segmentBefore) && /^\d/.test(segmentAfter)) return;
             }
             lastIndex = idx;
             bestSep = s;
@@ -137,6 +144,7 @@ function processDeal() {
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
 
             if (!isActuallyPriceInfo) {
+                // This is the most likely title, put it at the very front
                 candidateTitles.unshift(partWithoutPrice.trim());
                 finalPriceLine = partWithPrice.replace(emojiRegex, '').trim();
             }
@@ -149,19 +157,15 @@ function processDeal() {
     
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
-    
-    // Force button to show if there are multiple lines in the post
-    document.getElementById('retryBtn').style.display = lines.length > 2 ? 'block' : 'none';
+    document.getElementById('retryBtn').style.display = lines.length > 1 ? 'block' : 'none';
 }
 
 function tryNextTitle() {
     currentTitleIndex++;
-    // If we run out of filtered candidates, just use the raw lines from the post
     const text = document.getElementById('textInput').value;
     const allLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
     
     if (currentTitleIndex >= candidateTitles.length) {
-        // Cycle through all lines if candidates are exhausted
         let allIdx = currentTitleIndex - candidateTitles.length;
         if (allIdx >= allLines.length) {
             currentTitleIndex = 0;
