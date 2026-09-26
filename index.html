@@ -27,7 +27,7 @@
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.1.0</div>
+    <div class="version-tag">v1.2.0</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -56,7 +56,7 @@ let candidateTitles = [];
 let currentTitleIndex = 0;
 
 function processDeal() {
-    // --- 1. URL CLEANER ---
+    // --- 1. ADVANCED URL CLEANER (v10.0.40 Compatible) ---
     const rawUrl = document.getElementById('urlInput').value.trim();
     if (rawUrl) {
         try {
@@ -95,38 +95,31 @@ function processDeal() {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
     let finalPriceLine = rawPriceLine.replace(emojiRegex, '').replace(/See less$/i, '').trim();
 
-    // 1. Gather all lines that aren't the price line or retailer tags
+    // GLOBAL SHIELD FILTER (From v10.0.40)
+    const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "dropped the info", "quick scroll", "obsessed with", "hard to believe", "how low", "just went live", "spotted this", "had to post", "incredible value", "so happy", "solid grab", "loving this", "jaw dropped", "ran to post", "added to my list", "impressed", "glad we caught", "crazy good", "massive drop", "requested drop", "wonderful value", "top-tier", "spectacular", "brilliant", "info is waiting", "details are waiting", "seriously the easiest", "good discovery"];
+
     candidateTitles = lines.filter(line => {
         let l = line.toLowerCase();
-        // Filter out lines that are just retailer names or hype
         const isRetailerOnly = /^(amazon|walmart|target|kohls|cvs|walgreens)\s*[|:\[\]-]*$/i.test(line.replace(emojiRegex, '').trim());
         
         return !line.includes('$') && 
                !isRetailerOnly &&
                !line.startsWith('[') && 
-               !l.includes('brilliant find') &&
-               !l.includes('solid find') &&
-               !l.includes('happy to see') &&
-               !l.includes('dropped the info') &&
-               !l.includes('quick scroll') &&
-               !l.includes('obsessed with') &&
+               !globalShield.some(word => l.includes(word)) &&
                line.length > 3;
     });
 
-    // 2. SMART SPLIT: Check if the price line has a title attached
     const separators = [" : ", " // ", "👉", "📍", "📌", " -- ", " - ", " — ", " :: ", " | ", " ✨ ", " ~ "];
-    
     let bestSep = null;
     let lastIndex = -1;
 
     separators.forEach(s => {
         let idx = rawPriceLine.lastIndexOf(s);
         if (idx > lastIndex) {
-            // Robust Price Range Check: Ignore hyphens between digits (e.g. 99-38 or 99 - 38)
             if (s.trim() === "-" || s.trim() === "—") {
                 let segmentBefore = rawPriceLine.substring(0, idx).trim();
                 let segmentAfter = rawPriceLine.substring(idx + s.length).trim();
-                if (/\d$/.test(segmentBefore) && /^\d/.test(segmentAfter)) return;
+                if (/\d/.test(segmentBefore) && /^\d/.test(segmentAfter)) return;
             }
             lastIndex = idx;
             bestSep = s;
@@ -144,7 +137,6 @@ function processDeal() {
             const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
 
             if (!isActuallyPriceInfo) {
-                // This is the most likely title, put it at the very front
                 candidateTitles.unshift(partWithoutPrice.trim());
                 finalPriceLine = partWithPrice.replace(emojiRegex, '').trim();
             }
