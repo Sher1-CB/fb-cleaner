@@ -27,7 +27,7 @@
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.2.0</div>
+    <div class="version-tag">v1.3.0</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -56,7 +56,7 @@ let candidateTitles = [];
 let currentTitleIndex = 0;
 
 function processDeal() {
-    // --- 1. ADVANCED URL CLEANER (v10.0.40 Compatible) ---
+    // --- 1. URL CLEANER ---
     const rawUrl = document.getElementById('urlInput').value.trim();
     if (rawUrl) {
         try {
@@ -65,7 +65,6 @@ function processDeal() {
             const multiPermalink = params.get('multi_permalinks');
             const setParam = params.get('set');
             const groupID = params.get('idorvanity');
-            
             let cleanUrl = "";
             if (setParam && setParam.includes('gm.') && groupID) {
                 const postID = setParam.split('gm.')[1];
@@ -84,99 +83,69 @@ function processDeal() {
         }
     }
 
-    // --- 2. TEXT EXTRACTION ---
+    // --- 2. SMART TEXT EXTRACTION (v1.3.0) ---
     const text = document.getElementById('textInput').value;
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return;
-
-    let priceLineIndex = lines.findIndex(line => line.includes('$'));
-    let rawPriceLine = priceLineIndex !== -1 ? lines[priceLineIndex] : "";
-    
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
-    let finalPriceLine = rawPriceLine.replace(emojiRegex, '').replace(/See less$/i, '').trim();
+    const cleanText = text.replace(emojiRegex, '');
 
-    // GLOBAL SHIELD FILTER (From v10.0.40)
-    const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "dropped the info", "quick scroll", "obsessed with", "hard to believe", "how low", "just went live", "spotted this", "had to post", "incredible value", "so happy", "solid grab", "loving this", "jaw dropped", "ran to post", "added to my list", "impressed", "glad we caught", "crazy good", "massive drop", "requested drop", "wonderful value", "top-tier", "spectacular", "brilliant", "info is waiting", "details are waiting", "seriously the easiest", "good discovery"];
-
-    candidateTitles = lines.filter(line => {
-        let l = line.toLowerCase();
-        const isRetailerOnly = /^(amazon|walmart|target|kohls|cvs|walgreens)\s*[|:\[\]-]*$/i.test(line.replace(emojiRegex, '').trim());
-        
-        return !line.includes('$') && 
-               !isRetailerOnly &&
-               !line.startsWith('[') && 
-               !globalShield.some(word => l.includes(word)) &&
-               line.length > 3;
-    });
-
-    const separators = [" : ", " // ", "👉", "📍", "📌", " -- ", " - ", " — ", " :: ", " | ", " ✨ ", " ~ "];
-    let bestSep = null;
-    let lastIndex = -1;
-
-    separators.forEach(s => {
-        let idx = rawPriceLine.lastIndexOf(s);
-        if (idx > lastIndex) {
-            if (s.trim() === "-" || s.trim() === "—") {
-                let segmentBefore = rawPriceLine.substring(0, idx).trim();
-                let segmentAfter = rawPriceLine.substring(idx + s.length).trim();
-                if (/\d/.test(segmentBefore) && /^\d/.test(segmentAfter)) return;
-            }
-            lastIndex = idx;
-            bestSep = s;
-        }
-    });
+    // A. PRICE LOGIC: Find all prices and sort them
+    const priceRegex = /\$\d+(?:\.\d{2})?/g;
+    const allPrices = text.match(priceRegex) || [];
+    const numericPrices = allPrices.map(p => parseFloat(p.replace('$', ''))).sort((a, b) => a - b);
     
-    if (bestSep) {
-        let parts = [rawPriceLine.substring(0, lastIndex), rawPriceLine.substring(lastIndex + bestSep.length)];
-        let partWithPrice = parts.find(p => p.includes('$'));
-        let partWithoutPrice = parts.find(p => !p.includes('$'));
-        
-        if (partWithoutPrice && partWithPrice) {
-            const pLower = partWithoutPrice.toLowerCase();
-            const priceWords = ["regular", "normally", "list", "was", "orig", "previously", "msrp", "originally"];
-            const isActuallyPriceInfo = priceWords.some(word => pLower.includes(word));
+    let salePrice = numericPrices.length > 0 ? "$" + numericPrices[0] : "???";
+    let regPrice = numericPrices.length > 1 ? "$" + numericPrices[numericPrices.length - 1] : "";
 
-            if (!isActuallyPriceInfo) {
-                candidateTitles.unshift(partWithoutPrice.trim());
-                finalPriceLine = partWithPrice.replace(emojiRegex, '').trim();
-            }
-        }
+    // B. FULFILLMENT LOGIC
+    let fulfillment = "Shipped";
+    if (text.toLowerCase().includes("pickup")) fulfillment = "Pickup";
+    if (text.toLowerCase().includes("total")) fulfillment = "Total";
+
+    // C. TITLE LOGIC: Look for the title in the first paragraph
+    candidateTitles = [];
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    
+    // Strategy 1: Look for text between "on the" and "on Amazon/at Walmart"
+    const smartTitleMatch = text.match(/(?:on the|for the|this|these)\s+(.*?)\s+(?:on Amazon|at Amazon|at Walmart|on Walmart|where they|compared to)/i);
+    if (smartTitleMatch && smartTitleMatch[1]) {
+        candidateTitles.push(smartTitleMatch[1].trim());
     }
 
+    // Strategy 2: Add all lines that aren't just hype or retailer tags
+    const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "dropped the info", "quick scroll", "obsessed with", "hard to believe", "how low", "just went live", "spotted this", "had to post", "incredible value", "so happy", "solid grab", "loving this", "jaw dropped", "ran to post", "added to my list", "impressed", "glad we caught", "crazy good", "massive drop", "requested drop", "wonderful value", "top-tier", "spectacular", "brilliant", "info is waiting", "details are waiting", "seriously the easiest", "good discovery", "keeping tabs on"];
+
+    lines.forEach(line => {
+        let l = line.toLowerCase();
+        const isRetailerOnly = /^(amazon|walmart|target|kohls|cvs|walgreens)\s*[|:\[\]-]*$/i.test(line.replace(emojiRegex, '').trim());
+        if (!line.includes('$') && !isRetailerOnly && !line.startsWith('[') && !globalShield.some(word => l.includes(word)) && line.length > 3) {
+            candidateTitles.push(line);
+        }
+    });
+
+    // D. CONSTRUCT THE PRICE LINE (HOOK)
+    let hook = `${salePrice} ${fulfillment}!`;
+    if (regPrice) hook += ` (Regular ${regPrice})`;
+
     currentTitleIndex = 0;
-    displayTitle(candidateTitles[0]);
-    document.getElementById('resPriceLine').innerText = finalPriceLine || "Price not found";
+    displayTitle(candidateTitles[0] || "Title not found");
+    document.getElementById('resPriceLine').innerText = hook;
     
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
-    document.getElementById('retryBtn').style.display = lines.length > 1 ? 'block' : 'none';
+    document.getElementById('retryBtn').style.display = candidateTitles.length > 1 ? 'block' : 'none';
 }
 
 function tryNextTitle() {
     currentTitleIndex++;
-    const text = document.getElementById('textInput').value;
-    const allLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-    
-    if (currentTitleIndex >= candidateTitles.length) {
-        let allIdx = currentTitleIndex - candidateTitles.length;
-        if (allIdx >= allLines.length) {
-            currentTitleIndex = 0;
-            displayTitle(candidateTitles[0]);
-        } else {
-            displayTitle(allLines[allIdx]);
-        }
-    } else {
-        displayTitle(candidateTitles[currentTitleIndex]);
-    }
+    if (currentTitleIndex >= candidateTitles.length) currentTitleIndex = 0;
+    displayTitle(candidateTitles[currentTitleIndex]);
 }
 
 function displayTitle(rawTitle) {
-    if (!rawTitle) {
-        document.getElementById('resTitle').innerText = "Title not found";
-        return;
-    }
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
     let cleanTitle = rawTitle.replace(emojiRegex, '').replace(/See less$/i, '').trim();
+    // Capitalize first letter of each word for a cleaner title
+    cleanTitle = cleanTitle.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
     document.getElementById('resTitle').innerText = cleanTitle;
 }
 
