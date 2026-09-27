@@ -27,7 +27,7 @@
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.3.3</div>
+    <div class="version-tag">v1.3.4</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -83,29 +83,32 @@ function processDeal() {
         }
     }
 
-    // --- 2. SMART TEXT EXTRACTION (v1.3.3) ---
+    // --- 2. SMART TEXT EXTRACTION (v1.3.4) ---
     const text = document.getElementById('textInput').value;
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
 
-    // A. PRICE LOGIC
-    const priceRegex = /\$\d+(?:\.\d{2})?/g;
+    // A. PRICE LOGIC (Improved to catch "8 99" style)
+    const priceRegex = /\$\d+(?:\.\d{2})?|\b\d{1,3}\s\d{2}\b/g;
     const allPrices = text.match(priceRegex) || [];
-    const numericPrices = allPrices.map(p => parseFloat(p.replace('$', ''))).sort((a, b) => a - b);
+    const numericPrices = allPrices.map(p => {
+        let clean = p.replace('$', '').replace(' ', '.');
+        return parseFloat(clean);
+    }).sort((a, b) => a - b);
     
-    let salePrice = numericPrices.length > 0 ? "$" + numericPrices[0] : "???";
-    let regPrice = numericPrices.length > 1 ? "$" + numericPrices[numericPrices.length - 1] : "";
+    let salePrice = numericPrices.length > 0 ? "$" + numericPrices[0].toFixed(2).replace('.00', '') : "???";
+    let regPrice = numericPrices.length > 1 ? "$" + numericPrices[numericPrices.length - 1].toFixed(2).replace('.00', '') : "";
 
     // B. FULFILLMENT LOGIC
     let fulfillment = "Shipped";
     if (text.toLowerCase().includes("pickup")) fulfillment = "Pickup";
     if (text.toLowerCase().includes("total")) fulfillment = "Total";
 
-    // C. TITLE LOGIC (v1.3.3 Improved)
+    // C. TITLE LOGIC (v1.3.4 Improved)
     candidateTitles = [];
     
     // Strategy 1: Look for text between AI triggers and Retailer/Price/Punctuation stops
-    // Added "proper", "needs a", "needs" to triggers. Added "." and "!" to stops.
-    const smartTitleMatch = text.match(/(?:needs a proper|needs a|needs|on the|for the|this|these|tabs on|on)\s+(.*?)\s+(?:\.|\!|on Amazon|at Amazon|at Walmart|on Walmart|where they|compared to|down to|\$|currently lists)/i);
+    // Added "score", "grab", "can" to triggers. Added "for", "at" to stops.
+    const smartTitleMatch = text.match(/(?:score|grab|needs a proper|needs a|needs|on the|for the|this|these|tabs on|on|can)\s+(.*?)\s+(?:for|at|down to|\$|on Amazon|at Amazon|at Walmart|on Walmart|where they|compared to|currently lists|\.|\!)/i);
     if (smartTitleMatch && smartTitleMatch[1]) {
         candidateTitles.push(smartTitleMatch[1].trim());
     }
@@ -123,7 +126,7 @@ function processDeal() {
 
     // D. CONSTRUCT THE PRICE LINE
     let hook = `${salePrice} ${fulfillment}!`;
-    if (regPrice) hook += ` (Regular ${regPrice})`;
+    if (regPrice && regPrice !== salePrice) hook += ` (Regular ${regPrice})`;
 
     currentTitleIndex = 0;
     displayTitle(candidateTitles[0] || "Title not found");
@@ -131,25 +134,13 @@ function processDeal() {
     
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
-    document.getElementById('retryBtn').style.display = lines.length > 1 ? 'block' : 'none';
+    document.getElementById('retryBtn').style.display = candidateTitles.length > 1 ? 'block' : 'none';
 }
 
 function tryNextTitle() {
     currentTitleIndex++;
-    const text = document.getElementById('textInput').value;
-    const allLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3);
-    
-    if (currentTitleIndex >= candidateTitles.length) {
-        let allIdx = currentTitleIndex - candidateTitles.length;
-        if (allIdx >= allLines.length) {
-            currentTitleIndex = 0;
-            displayTitle(candidateTitles[0]);
-        } else {
-            displayTitle(allLines[allIdx]);
-        }
-    } else {
-        displayTitle(candidateTitles[currentTitleIndex]);
-    }
+    if (currentTitleIndex >= candidateTitles.length) currentTitleIndex = 0;
+    displayTitle(candidateTitles[currentTitleIndex]);
 }
 
 function displayTitle(rawTitle) {
