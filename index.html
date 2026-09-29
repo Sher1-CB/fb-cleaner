@@ -27,7 +27,7 @@
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.5.0</div>
+    <div class="version-tag">v1.5.1</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -55,7 +55,6 @@
 let candidateTitles = [];
 let currentTitleIndex = 0;
 
-// V10.1.40 DETERMINISTIC JAVASCRIPT FIREWALL
 function sanitizeDealCopy(text) {
     if (!text) return "";
     return text
@@ -103,7 +102,7 @@ function processDeal() {
     const text = document.getElementById('textInput').value;
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
 
-    // A. PRICE LOGIC (v10.1.40 Sync)
+    // A. PRICE LOGIC
     const priceRegex = /\$?\d+(?:\.\d{2})|\b\d{1,3}\s\d{2}\b/g;
     const allPrices = text.match(priceRegex) || [];
     const numericPrices = allPrices.map(p => {
@@ -112,7 +111,6 @@ function processDeal() {
     }).sort((a, b) => a - b);
     
     let salePrice = numericPrices.length > 0 ? "$" + numericPrices[0].toFixed(2).replace('.00', '') : "???";
-    // v10.1.40 Rule: If range, pick HIGHEST for regular price. Format: "XX XX"
     let regPrice = numericPrices.length > 1 ? numericPrices[numericPrices.length - 1].toFixed(2).replace('.', ' ') : "";
 
     // B. FULFILLMENT LOGIC
@@ -120,11 +118,12 @@ function processDeal() {
     if (text.toLowerCase().includes("pickup")) fulfillment = "Pickup";
     if (text.toLowerCase().includes("total")) fulfillment = "Total";
 
-    // C. TITLE LOGIC
+    // C. TITLE LOGIC (v1.5.1 Improved Stops)
     candidateTitles = [];
     const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "point drop", "price drop", "great drop", "90 day low", "lowest price"];
 
-    const smartTitleMatch = text.match(/(?:finding these|finding this|finding a|pick up the|pick up|decided to|score|grab|needs a proper|needs a|needs|on the|for the|this|these|tabs on|can|found the|found a|drop on the|drop on)\s+(.*?)\s+(?:over on|on Amazon|at Amazon|at Walmart|on Walmart|where they|currently|for|at|down from|down to|\$|currently lists|\.|\!)/i);
+    // Added "is", "are", "was", "were" to stops
+    const smartTitleMatch = text.match(/(?:finding these|finding this|finding a|pick up the|pick up|decided to|score|grab|needs a proper|needs a|needs|on the|for the|this|these|tabs on|can|found the|found a|drop on the|drop on|the)\s+(.*?)\s+(?:is|are|was|were|over on|on Amazon|at Amazon|at Walmart|on Walmart|where they|currently|for|at|down from|down to|\$|currently lists|\.|\!)/i);
     if (smartTitleMatch && smartTitleMatch[1]) {
         candidateTitles.push(smartTitleMatch[1].trim());
     }
@@ -173,7 +172,6 @@ function tryNextTitle() {
 function displayTitle(rawTitle) {
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
     let cleanTitle = rawTitle.replace(emojiRegex, '').replace(/See less$/i, '').trim();
-    // Preserve "ADD/QTY" but capitalize others
     cleanTitle = cleanTitle.split(' ').map(w => {
         if (/^(ADD|BUY|QTY)$/i.test(w)) return w.toUpperCase();
         return w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1) : "";
@@ -185,9 +183,7 @@ function copyAll() {
     const title = document.getElementById('resTitle').innerText;
     const price = document.getElementById('resPriceLine').innerText;
     const url = document.getElementById('cleanUrl').innerText;
-    // Final pass through the firewall before copying
     const combinedText = sanitizeDealCopy(`${title}\n${price}\n${url}`);
-
     navigator.clipboard.writeText(combinedText).then(() => {
         const btn = document.getElementById('copyAllBtn');
         btn.innerText = "✅ Copied Everything!";
