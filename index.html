@@ -27,7 +27,7 @@
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.7.1</div>
+    <div class="version-tag">v1.7.2</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -106,21 +106,21 @@ function processDeal() {
     const text = document.getElementById('textInput').value;
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
 
-    // A. PRICE LOGIC (v1.7.1 Improved for "ranging from" phrases)
+    // A. PRICE LOGIC (v1.7.2 Improved for "down from" ranges)
     const saleRangeRegex = /\$\d+(?:\.\d{2})?(?:\s*-\s*\$?\d+(?:\.\d{2})?)?/;
     const saleMatch = text.match(saleRangeRegex);
     let salePrice = saleMatch ? saleMatch[0] : "???";
 
-    // Find Regular Price - specifically looking for "ranging from" or "previously"
-    const regPriceRegex = /(?:regular|previously|was|normally|list|orig|msrp|originally|ranging from)\s*(\$?\d+(?:[.\s]\d{2})?(?:\s*(?:-|up to|to)\s*\$?\d+(?:[.\s]\d{2})?)?)/i;
+    // Find Regular Price - Added "down from" and "dropping from"
+    const regPriceRegex = /(?:regular|previously|was|normally|list|orig|msrp|originally|ranging from|down from|dropping from)\s*(\$?\d+(?:[.\s]\d{2})?(?:\s*(?:-|up to|to)\s*\$?\d+(?:[.\s]\d{2})?)?)/i;
     const regMatch = text.match(regPriceRegex);
     let regPrice = "";
     if (regMatch && regMatch[1]) {
-        let rawReg = regMatch[1].replace(/\$/g, '').replace(/\./g, ' ').trim();
-        // Extract all numbers and pick the highest
-        let numbers = rawReg.match(/\d+[\s]\d{2}|\d+/g);
+        let rawReg = regMatch[1].replace(/\$/g, '').trim();
+        // Extract all numbers (handles both 10.99 and 10 99)
+        let numbers = rawReg.match(/\d+[\s.]\d{2}|\d+/g);
         if (numbers) {
-            let numericValues = numbers.map(n => parseFloat(n.replace(' ', '.')));
+            let numericValues = numbers.map(n => parseFloat(n.replace(/\s+/, '.')));
             regPrice = Math.max(...numericValues).toFixed(2).replace('.', ' ');
         }
     }
