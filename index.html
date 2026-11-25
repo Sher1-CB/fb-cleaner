@@ -16,18 +16,18 @@
         .btn-group { display: flex; gap: 10px; margin-top: 10px; }
         .btn-primary { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; flex: 3; font-size: 16px; }
         .btn-clear { background: #f1f3f4; color: #5f6368; border: 1px solid var(--border); padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; flex: 1; font-size: 16px; }
-        .btn-copy-all { background: var(--success); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 20px; font-size: 18px; display: none; }
-        .btn-retry { background: #fff; color: var(--primary); border: 1px solid var(--primary); padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 20px; font-size: 14px; display: none; }
+        .btn-copy-all { background: var(--success); color: white; border: none; padding: 15px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 18px; display: none; }
+        .btn-secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); padding: 10px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 10px; font-size: 14px; display: none; }
         .results { margin-top: 25px; display: none; border-top: 2px solid #eee; padding-top: 20px; }
         .result-card { background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 12px; border: 1px solid var(--border); }
         .result-card span { display: block; font-size: 11px; color: var(--primary); font-weight: bold; text-transform: uppercase; margin-bottom: 6px; }
-        .result-card strong { font-size: 15px; word-break: break-all; color: #1c1e21; line-height: 1.4; }
+        .result-card strong { font-size: 15px; word-break: break-all; color: #1c1e21; line-height: 1.4; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="version-tag">v1.6.2</div>
+    <div class="version-tag">v1.7.0</div>
     <h2>CB Link & Text Extractor</h2>
     
     <label>1. Paste Facebook URL</label>
@@ -43,7 +43,10 @@
 
     <div id="output" class="results">
         <button id="copyAllBtn" class="btn-copy-all" onclick="copyAll()">📋 Copy All Info</button>
-        <button id="retryBtn" class="btn-retry" onclick="tryNextTitle()">🔄 Wrong title? Try another line</button>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button id="retryBtn" class="btn-secondary" onclick="tryNextTitle()">🔄 Try another line</button>
+            <button id="shuffleBtn" class="btn-secondary" onclick="shuffleLayout()">🔀 Shuffle Layout</button>
+        </div>
         
         <div class="result-card"><span>Product Title</span><strong id="resTitle"></strong></div>
         <div class="result-card"><span>Full Price Line (Hook)</span><strong id="resPriceLine"></strong></div>
@@ -55,22 +58,24 @@
 let candidateTitles = [];
 let currentTitleIndex = 0;
 
+// V10.3.48 HARDENED JAVASCRIPT FIREWALL
 function sanitizeDealCopy(text) {
     if (!text) return "";
     return text
         .replace(/\bShpped\b/gi, 'Shipped')
         .replace(/(?<![\$\d])(\d+)[.\s](\d{2})\s+(Shipped|Pickup|Total)\b/gi, '$$$1.$2 $3')
-        .replace(/\bpreviously regular\b/gi, 'previously')
-        .replace(/\bdown from regular\b/gi, 'down from')
+        .replace(/\bthe previously\b/gi, 'previously')
+        .replace(/\b(previously|down from|was|dropping from)\s+(regular|orig|original|list|retail|msrp)\b/gi, '$1')
+        .replace(/\b(stress|hassle|mess|clutter)[\s-]free\b/gi, 'effortless')
         .replace(/\bfree\s+(shipping|delivery)\b/gi, 'complimentary delivery')
         .replace(/\bfree\s+(store\s+)?pickup\b/gi, 'pickup is included')
         .replace(/\b(this|the|an|great|special|massive|good|nice|solid)\s+(offer|discount|markdown|promotion|promo|reduction|deal|steal|bargain|doorbuster|blowout|voucher|coupon|closeout)s?\b/gi, '$1 find')
-        .replace(/\b(discounts?|markdowns?|promotions?|promos?|reductions?|steals?|bargains?|doorbusters?|blowouts?|vouchers?|coupons?|closeouts?)\b/gi, 'find')
         .replace(/\b(an absolute|a total|a)\s+breeze\b/gi, 'effortless')
         .replace(/\bbreeze\b/gi, 'simple')
-        .replace(/\b(stress|hassle|mess|clutter)[\s-]free\b/gi, 'effortless')
         .replace(/\bvessels\b/gi, 'travel mugs')
-        .replace(/\bvessel\b/gi, 'travel mug')
+        .replace(/\bcolorways?\b/gi, 'color')
+        .replace(/\b(a|an|the|this)\s+upgrade\b/gi, '$1 addition')
+        .replace(/\b(you\s+can\s+)?(locate|find|check|grab|see|access)\s+(it\s+)?via\s*/gi, '')
         .replace(/\b(a\s+)?(total\s+)?game changer\b/gi, 'a wonderful addition');
 }
 
@@ -104,19 +109,21 @@ function processDeal() {
     const text = document.getElementById('textInput').value;
     const emojiRegex = /[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F1E6}-\u{1F1FF}]/gu;
 
+    // A. PRICE LOGIC (v10.3.48 Sync)
     const saleRangeRegex = /\$\d+(?:\.\d{2})?(?:\s*-\s*\$?\d+(?:\.\d{2})?)?/;
     const saleMatch = text.match(saleRangeRegex);
     let salePrice = saleMatch ? saleMatch[0] : "???";
 
-    // Added "down from" and "dropping from" to keywords
     const regPriceRegex = /(?:regular|previously|was|normally|list|orig|msrp|originally|down from|dropping from)\s*(\$?\d+(?:[.\s]\d{2})?(?:\s*-\s*\$?\d+(?:[.\s]\d{2})?)?)/i;
     const regMatch = text.match(regPriceRegex);
     let regPrice = "";
     if (regMatch && regMatch[1]) {
-        regPrice = regMatch[1].replace('$', '').replace('.', ' ').trim();
-        if (regPrice.includes('-')) {
-            let parts = regPrice.split('-').map(p => parseFloat(p.trim().replace(' ', '.')));
+        let rawReg = regMatch[1].replace('$', '').replace('.', ' ').trim();
+        if (rawReg.includes('-')) {
+            let parts = rawReg.split('-').map(p => parseFloat(p.trim().replace(' ', '.')));
             regPrice = Math.max(...parts).toFixed(2).replace('.', ' ');
+        } else {
+            regPrice = rawReg;
         }
     }
 
@@ -124,8 +131,9 @@ function processDeal() {
     if (text.toLowerCase().includes("pickup")) fulfillment = "Pickup";
     if (text.toLowerCase().includes("total")) fulfillment = "Total";
 
+    // B. TITLE LOGIC
     candidateTitles = [];
-    const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "point drop", "price drop", "great drop", "90 day low", "lowest price", "brilliant find", "solid find", "happy to see", "dropped the info", "quick scroll", "obsessed with", "hard to believe", "how low", "just went live", "spotted this", "had to post", "incredible value", "solid grab", "loving this", "jaw dropped", "ran to post", "added to my list", "impressed", "glad we caught", "crazy good", "massive drop", "requested drop", "wonderful value", "top-tier", "spectacular", "brilliant", "info is waiting", "details are waiting", "seriously the easiest", "good discovery", "keeping tabs on", "currently lists", "decided to"];
+    const globalShield = ["buy", "order", "purchase", "shop", "checkout", "cart", "basket", "price", "cost", "spend", "payment", "fee", "charge", "sale", "deal", "deals", "save", "savings", "discount", "markdown", "clearance", "offer", "promo", "coupon", "voucher", "claim", "redeem", "code", "free", "hurry", "act fast", "today only", "ending soon", "limited time", "flash sale", "sold out", "miss out", "rare", "exclusive", "restock", "gone", "run", "grab", "like", "share", "tag", "comment", "react", "vote", "link", "url", "website", "click", "tap", "bio", "dm", "alert", "shocking", "mind-blowing", "secret", "hack", "viral", "game changer", "stock", "inventory", "elevate", "transform", "seamless", "oasis", "upgrade", "must-have", "essential", "perfect addition", "point drop", "price drop", "great drop", "90 day low", "lowest price"];
 
     const smartTitleMatch = text.match(/(?:finding these|finding this|finding a|pick up the|pick up|decided to|score|grab|needs a proper|needs a|needs|on the|for the|this|these|tabs on|can|found the|found a|drop on the|drop on|the|has the)\s+(.*?)\s+(?:\bis\b|\bare\b|\bwas\b|\bwere\b|sitting at|over on|on Amazon|at Amazon|at Walmart|on Walmart|where they|currently|for|at|down from|down to|\$|currently lists|\.|\!)/i);
     if (smartTitleMatch && smartTitleMatch[1]) {
@@ -146,10 +154,7 @@ function processDeal() {
 
     currentTitleIndex = 0;
     let initialTitle = candidateTitles[0] || "Title not found";
-    
-    // SCRUB RETAILER PREFIXES (e.g. "Amazon find. ")
     initialTitle = initialTitle.replace(/^(amazon|walmart|target|woot|kohls|cvs|walgreens)\s+find\.?\s*/gi, '');
-
     if (!/\bADD\s+\d+/i.test(text)) {
         initialTitle = initialTitle.replace(/\s*ADD\s+\d+(\s+QTY)?\b/gi, '').trim();
     }
@@ -160,6 +165,22 @@ function processDeal() {
     document.getElementById('output').style.display = 'block';
     document.getElementById('copyAllBtn').style.display = 'block';
     document.getElementById('retryBtn').style.display = lines.length > 1 ? 'block' : 'none';
+    document.getElementById('shuffleBtn').style.display = 'block';
+}
+
+function shuffleLayout() {
+    const el = document.getElementById('resPriceLine');
+    let currentText = el.innerText;
+    let sentences = currentText.split(/(?<=[.!?])\s+/).map(s => s.trim());
+    
+    if (sentences.length > 1) {
+        // Randomly choose between single block or airy spacing
+        if (currentText.includes('\n\n')) {
+            el.innerText = sentences.join(' ');
+        } else {
+            el.innerText = sentences.join('\n\n');
+        }
+    }
 }
 
 function tryNextTitle() {
